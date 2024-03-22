@@ -45,26 +45,62 @@ void make_header(){
 	// Encode Group ID
 	send_header = send_header ^ pkt_struct->group_id;
 	send_header << 3;
+	
 	// Encode type
 	send_header = send_header ^ pkt_struct->type;
 	send_header << 8;
+	
 	// Encode Request Number
 	send_header = send_header ^ pkt_struct->request_num;
 	send_header << 1;
+	
 	// Encode Padding
 	send_header = send_header ^ pkt_struct->pad;
 	send_header << 5;
+	
 	// Encode Sender ID
 	send_header = send_header ^ pkt_struct->sender_id;
 	send_header << 5;
+	
 	// Encode Receiver ID
 	send_header = send_header ^ pkt_struct->receiver_id;
 	send_header << 6;
+	
 	// Encode Record Index or Status
 	send_header = send_header ^ pkt_struct->record_status;
 }
 
-// Cast received header into struct
+// Cast received header into struct using masks
+void unpack_header(){
+	// Decode Group ID
+	long int gid_mask = 	0b11110000000000000000000000000000;
+	rcv_pkt->group_id = rcv_header ^ gid_mask;
+	
+	// Decode Type
+	long int type_mask = 	0b00001110000000000000000000000000;
+	rcv_pkt->type = rcv_header ^ type_mask;
+	
+	// Decode Request Number
+	long int request_mask = 0b00000001111111100000000000000000;
+	rcv_pkt->request_num = rcv_header ^ request_mask;
+	
+	// Decode Padding
+	long int pad_mask = 	0b00000000000000010000000000000000;
+	rcv_pkt->pad = rcv_header ^ pad_mask;
+	
+	// Decode Sender ID
+	long int sid_mask = 	0b00000000000000001111100000000000;
+	rcv_pkt->sender_id = rcv_header ^ sid_mask;
+	
+	// Decode Receiver ID
+	long int rcv_mask = 	0b00000000000000000000011111000000;
+	rcv_pkt->receiver_id = rcv_header ^ rcv_mask;
+	
+	// Decode Record Index or Status
+	long int stat_mask = 	0b00000000000000000000000000111111;
+	rcv_pkt->record_status = rcv_header ^ stat_mask;
+}
+
 
 /* Receiving FSM; runs concurrently to root */
 fsm receiver {
