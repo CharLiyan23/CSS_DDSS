@@ -295,6 +295,7 @@ fsm root {
         tcv_endp(packet);
         ufree(disc_req); // Free up malloc'd space for sent packet
         delay(FIND_SEND, 3*1024);
+        release;
         
     // Print results
     state FIND_PRINT:
