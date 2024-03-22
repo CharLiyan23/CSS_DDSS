@@ -116,6 +116,7 @@ int unpack_header(){
 
 
 /********************* Receiver FSM, concurrent to root **********************/
+// TODO: NOT DONE. See below.
 fsm receiver {
     address packet; //received packets
     
@@ -171,7 +172,7 @@ fsm root {
 		"(D)elete record from neighbour\r\n"
 		"(R)etrieve record from neighbour\r\n"
 		"(S)how local records\r\n"
-		"R(E)set local storage\r\n\r\n"
+		"R(e)set local storage\r\n\r\n"
 		"Selection: ", 
 		group_id, node_id, curr_store, total_store
 	);
@@ -237,8 +238,30 @@ fsm root {
     	else
     		proceed CHANGE_NID_PROMPT;
     
-    
+/**************************** Find Protocol States ***************************/
 
+//TODO: Make states
+
+/************************** Create Protocol States ***************************/
+
+//TODO: Make states
+
+/************************** Delete Protocol States ***************************/
+
+//TODO: Make states
+
+/************************ Retrieve Protocol States ***************************/
+
+//TODO: Make states
+
+/**************************** Show Record States *****************************/
+
+//TODO: Make states
+
+/*************************** Clear Record States *****************************/
+    
+//TODO: Make states
+    
     
 /*** Transmission States OLD CODE FOR REFERENCE. REMOVE BEFORE SUBMISSION ****/
     	
