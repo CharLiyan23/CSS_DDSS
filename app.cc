@@ -37,6 +37,9 @@ struct pkt_struct {
   char message[20]; 
 };
 
+pkt_struct send_pkt;
+pkt_struct rcv_pkt; 
+
 // Convert info from pkt_struct into packet header
 void make_header(){
 	// Encode Group ID
@@ -60,6 +63,8 @@ void make_header(){
 	// Encode Record Index or Status
 	send_header = send_header ^ pkt_struct->record_status;
 }
+
+// Cast received header into struct
 
 /* Receiving FSM; runs concurrently to root */
 fsm receiver {
@@ -92,8 +97,8 @@ fsm receiver {
 fsm root {
     char msg_string[20];
     struct msg * ext_packet;
-    current_store = 0; //placeholder
-    total_store = 40;
+    int curr_store = 0; //placeholder
+    int total_store = 40;
     address packet;    
 
     /*Initialization*/
