@@ -20,14 +20,20 @@
 int sfd;
 
 /* Globals for message transmissions */
+int group_id = 3;
 int node_id = 1;
 int seq_num = 0;
+double pkt = 0;
 
-struct msg {
+struct pkt_struct {
+  byte group_id;
+  byte type;
+  byte request_num;
+  byte pad;
   byte sender_id;
   byte receiver_id;
-  byte sequence_number;
-  char payload[27]; 
+  byte record_status;
+  char message[20]; 
 };
 
 /* Receiving FSM; runs concurrently to root */
@@ -59,8 +65,10 @@ fsm receiver {
 
 // Main FSM for sending packets
 fsm root {
-    char msg_string[27];
-    struct msg * payload;
+    char msg_string[20];
+    struct msg * ext_packet;
+    current_store = 0; //placeholder
+    total_store = 40;
     address packet;    
 
     /*Initialization*/
@@ -80,12 +88,17 @@ fsm root {
     // User menu and selection states
     state MENU:
 	ser_outf (MENU, 
-		"P2P Chat (Node #%d)\n\r"
-		"(C)hange node ID\n\r"
-		"(D)irect transmission\n\r"
-		"(B)roadcast transmission\n\r"
+		"\r\nGroup %d Device #%d (%d/%d records)\r\n"
+		"(G)roup ID\r\n"
+		"(N)ew device ID\r\n"
+		"(F)ind neighbours\r\n"
+		"(C)reate record on neighbour\r\n"
+		"(D)elete record from neighbour\r\n"
+		"(R)etrieve record from neighbour\r\n"
+		"(S)how local records\r\n"
+		"R(e)set local storage\r\n\r\n"
 		"Selection: ", 
-		node_id
+		group_id, node_id, curr_store, total_store
 	);
 	
     // User selection and redirection to correct state
