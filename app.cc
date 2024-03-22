@@ -294,14 +294,17 @@ fsm root {
     	make_header(disc_req, packet+1);
         tcv_endp(packet);
         ufree(disc_req); // Free up malloc'd space for sent packet
-        delay(3*1024, FIND_SEND);
+        delay(3*1024, FIND_PRINT);
         release;
-        
+
     // Print results
     state FIND_PRINT:
+    	if (strlen(neighbours) > 0){
     	ser_outf(FIND_PRINT, "%s\r\n", neighbours);
+    	}
+    	else 
+    	ser_out(FIND_PRINT, "No neighbours\r\n");
        	proceed MENU;
-
 	
 /************************** Create Protocol States ***************************/
 
