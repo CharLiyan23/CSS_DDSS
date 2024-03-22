@@ -288,13 +288,13 @@ fsm root {
     	disc_req->sender_id = node_id;
     	disc_req->receiver_id = 0;
     	
-    // Finish building Broadcast packet and send off
+    // Finish building discovery request packet and send off
     state FIND_SEND:
     	packet = tcv_wnp(FIND_SEND, sfd, 32);
     	make_header(disc_req, packet+1);
         tcv_endp(packet);
         ufree(disc_req); // Free up malloc'd space for sent packet
-        delay(FIND_SEND, 3*1024);
+        delay(3*1024, FIND_SEND);
         release;
         
     // Print results
