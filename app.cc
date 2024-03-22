@@ -175,9 +175,9 @@ fsm root {
     	ser_inf(SELECT, "%c", cmd);
     	
     	if (cmd[0] == 'G' or cmd[0] == 'g')
-    		proceed CHANGE_NID_PROMPT;
+    		proceed CHANGE_GID_PROMPT;
     	else if (cmd[0] == 'N' or cmd[0] == 'n')
-    		proceed DIRECT;
+    		proceed CHANGE_NID_PROMPT;
     	else if (cmd[0] == 'F' or cmd[0] == 'f')
     		proceed BROADCAST_BUILD;
     	else if (cmd[0] == 'C' or cmd[0] == 'c')
@@ -193,6 +193,22 @@ fsm root {
     	else
     		proceed INPUT_ERROR;
     		
+    		
+    // Change Group ID states
+    state CHANGE_GID_PROMPT:
+    	ser_out(CHANGE_GID_PROMPT, "New Group ID (1-16): ");
+    	
+    // Parse user input for Group ID
+    state CHANGE_GID:
+    	char temp_id[4];
+    	ser_inf(CHANGE_GID, "%d", temp_id);
+    	if ((temp_id[0] > 0) && (temp_id[0] < 17)){
+    		group_id = temp_id[0];
+    		proceed MENU;
+    		}
+    	else
+    		proceed CHANGE_GID_PROMPT;
+    		
     // Change Node ID states
     state CHANGE_NID_PROMPT:
     	ser_out(CHANGE_NID_PROMPT, "New Node ID (1-25): ");
@@ -207,6 +223,7 @@ fsm root {
     		}
     	else
     		proceed CHANGE_NID_PROMPT;
+    
     
     /* Transmission States */
     	
