@@ -15,7 +15,12 @@
 #include "tcv.h"
 
 #define CC1350_BUF_SZ	250
-
+#define DISC_REQ 	0
+#define DISC_RES 	1
+#define CREATE_REC 	2
+#define DELETE_REC	3
+#define GET_REC		4
+#define RES_REC		5
 
 
 /*********************** Global Variables and Structs ************************/
@@ -240,7 +245,22 @@ fsm root {
     
 /**************************** Find Protocol States ***************************/
 
-//TODO: Make states
+    // Build Discovery Request Packet
+    state FIND_BUILD:
+    	disc_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
+    	disc_req->group_id = group_id;
+    	disc_req->type = DISC_REQ; 
+    	disc_req->request_num = ;
+    	disc_req->sender_id = node_id;
+    	disc_req->receiver_id = 0;
+    	
+    // Finish building Broadcast packet and send off
+    state FIND_SEND:
+    	packet = tcv_wnp(FIND_SEND, sfd, 32);
+    	make_header();
+        tcv_endp(send_header);
+        ufree(disc_req); // Free up malloc'd space for sent packet
+        proceed MENU;
 
 /************************** Create Protocol States ***************************/
 
