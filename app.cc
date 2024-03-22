@@ -32,6 +32,7 @@ int sfd;
 int group_id = 3;
 int node_id = 1;
 int seq_num = 0;
+int neighbours[10];
 long int send_header = 0;
 long int rcv_header = 0;
 
@@ -138,7 +139,31 @@ fsm receiver {
         if (check != 0)
         	return;
         	
-        // TODO: Figure out what to do with packets based on type	
+        // Discovery Request
+        if (rcv_pkt->type == 0){
+            
+            // Build Response
+	    disc_res = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
+	    disc_res->group_id = group_id;
+	    disc_res->type = DISC_RES; 
+	    disc_res->request_num = rcv_pkt->request_num;
+	    disc_res->sender_id = node_id;
+	    disc_res->receiver_id = 0;
+	    	
+	    // Finish building discovery response packet and send off
+	    packet = tcv_wnp(FIND_SEND, sfd, 32);
+	    make_header();
+	    tcv_endp(send_header);
+	    ufree(disc_res); // Free up malloc'd space for sent packet
+	}
+        	
+        // Discovery Response
+        else if (rcv_pkt->type == 1){
+           // Record response
+           neighbours[len(neighbours)] = rcv_pkt->sender_id;
+        }
+        
+        // TODO: Figure out what to do with packets based on rest of types
 	
         tcv_endp(packet);
         proceed Receiving;
@@ -260,8 +285,8 @@ fsm root {
     	make_header();
         tcv_endp(send_header);
         ufree(disc_req); // Free up malloc'd space for sent packet
-        proceed MENU;
 
+	
 /************************** Create Protocol States ***************************/
 
 //TODO: Make states
