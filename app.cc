@@ -294,8 +294,11 @@ fsm root {
     	make_header(disc_req, packet+1);
         tcv_endp(packet);
         ufree(disc_req); // Free up malloc'd space for sent packet
+        delay(FIND_SEND, 3*1024);
         
-       	// temporary, replace with 3s wait interval and printout
+    // Print results
+    state FIND_PRINT:
+    	ser_outf(FIND_PRINT, "%s\r\n", neighbours);
        	proceed MENU;
 
 	
