@@ -23,7 +23,8 @@ int sfd;
 int group_id = 3;
 int node_id = 1;
 int seq_num = 0;
-double pkt = 0;
+long int send_header = 0;
+long int rcv_header = 0;
 
 struct pkt_struct {
   byte group_id;
@@ -35,6 +36,35 @@ struct pkt_struct {
   byte record_status;
   char message[20]; 
 };
+
+pkt_struct send_pkt;
+pkt_struct rcv_pkt; 
+
+// Convert info from pkt_struct into packet header
+void make_header(){
+	// Encode Group ID
+	send_header = send_header ^ pkt_struct->group_id;
+	send_header << 3;
+	// Encode type
+	send_header = send_header ^ pkt_struct->type;
+	send_header << 8;
+	// Encode Request Number
+	send_header = send_header ^ pkt_struct->request_num;
+	send_header << 1;
+	// Encode Padding
+	send_header = send_header ^ pkt_struct->pad;
+	send_header << 5;
+	// Encode Sender ID
+	send_header = send_header ^ pkt_struct->sender_id;
+	send_header << 5;
+	// Encode Receiver ID
+	send_header = send_header ^ pkt_struct->receiver_id;
+	send_header << 6;
+	// Encode Record Index or Status
+	send_header = send_header ^ pkt_struct->record_status;
+}
+
+// Cast received header into struct
 
 /* Receiving FSM; runs concurrently to root */
 fsm receiver {
@@ -67,8 +97,8 @@ fsm receiver {
 fsm root {
     char msg_string[20];
     struct msg * ext_packet;
-    current_store = 0; //placeholder
-    total_store = 40;
+    int curr_store = 0; //placeholder
+    int total_store = 40;
     address packet;    
 
     /*Initialization*/
