@@ -16,16 +16,21 @@
 
 #define CC1350_BUF_SZ	250
 
+
+
+/*********************** Global Variables and Structs ************************/
+
 /* session descriptor for the single VNETI session */
 int sfd;
 
-/* Globals for message transmissions */
+/* IDs etc for messages */
 int group_id = 3;
 int node_id = 1;
 int seq_num = 0;
 long int send_header = 0;
 long int rcv_header = 0;
 
+// Packet Struct
 struct pkt_struct {
   byte group_id;
   byte type;
@@ -39,6 +44,8 @@ struct pkt_struct {
 
 pkt_struct send_pkt;
 pkt_struct rcv_pkt; 
+
+/*************************** Conversion Functions ****************************/
 
 // Convert info from pkt_struct into packet header
 void make_header(){
@@ -71,38 +78,45 @@ void make_header(){
 }
 
 // Cast received header into struct using masks
-void unpack_header(){
+// return 0 if correct group ID, 1 if not
+int unpack_header(){
 	// Decode Group ID
 	long int gid_mask = 	0b11110000000000000000000000000000;
-	rcv_pkt->group_id = rcv_header ^ gid_mask;
+	rcv_pkt-> (group_id = rcv_header ^ gid_mask) >> 28;
+	
+	if (rcv_pkt->group_id != group_id):
+		return 1;
 	
 	// Decode Type
 	long int type_mask = 	0b00001110000000000000000000000000;
-	rcv_pkt->type = rcv_header ^ type_mask;
+	rcv_pkt->type = (rcv_header ^ type_mask) >> 25;
 	
 	// Decode Request Number
 	long int request_mask = 0b00000001111111100000000000000000;
-	rcv_pkt->request_num = rcv_header ^ request_mask;
+	rcv_pkt->request_num = (rcv_header ^ request_mask) >> 17;
 	
 	// Decode Padding
 	long int pad_mask = 	0b00000000000000010000000000000000;
-	rcv_pkt->pad = rcv_header ^ pad_mask;
+	rcv_pkt->pad = (rcv_header ^ pad_mask) >> 16;
 	
 	// Decode Sender ID
 	long int sid_mask = 	0b00000000000000001111100000000000;
-	rcv_pkt->sender_id = rcv_header ^ sid_mask;
+	rcv_pkt->sender_id = (rcv_header ^ sid_mask) >> 11;
 	
 	// Decode Receiver ID
 	long int rcv_mask = 	0b00000000000000000000011111000000;
-	rcv_pkt->receiver_id = rcv_header ^ rcv_mask;
+	rcv_pkt->receiver_id = (rcv_header ^ rcv_mask) >> 6;
 	
 	// Decode Record Index or Status
 	long int stat_mask = 	0b00000000000000000000000000111111;
 	rcv_pkt->record_status = rcv_header ^ stat_mask;
+	
+	return 0;
 }
 
 
-/* Receiving FSM; runs concurrently to root */
+/********************* Receiver FSM, concurrent to root **********************/
+// TODO: NOT DONE. See below.
 fsm receiver {
     address packet; //received packets
     
@@ -113,18 +127,14 @@ fsm receiver {
     // If packet properly received
     state OK:
     	// Cast packet into readable structure
-        struct msg* payload = (struct msg*)(packet+1);
+        check = unpack_header();
         
-        // Check if broadcast
-        if (payload->receiver_id == 0)
-        	ser_outf(OK,"\r\nBroadcast from node %d (Seq: %d): %s \r\n",
-        	payload->sender_id, payload->sequence_number, payload->payload);
+        // Check if correct group ID, return if wrong
+        if (check != 0)
+        	return;
         	
-        // Direct Message
-        else if (payload->receiver_id == node_id)
-        	ser_outf(OK,"\r\nMessage from node %d (Seq: %d): %s \r\n",
-        	payload->sender_id, payload->sequence_number, payload->payload);
-    
+        // TODO: Figure out what to do with packets based on type	
+	
         tcv_endp(packet);
         proceed Receiving;
 }
@@ -133,7 +143,7 @@ fsm receiver {
 fsm root {
     char msg_string[20];
     struct msg * ext_packet;
-    int curr_store = 0; //placeholder
+    int curr_store = 0; 
     int total_store = 40;
     address packet;    
 
@@ -151,7 +161,7 @@ fsm root {
         tcv_control(sfd, PHYSOPT_ON, NULL);
         runfsm receiver;
 	
-    // User menu and selection states
+/********************** User menu and selection states ***********************/
     state MENU:
 	ser_outf (MENU, 
 		"\r\nGroup %d Device #%d (%d/%d records)\r\n"
@@ -172,14 +182,46 @@ fsm root {
     	char cmd[4];
     	ser_inf(SELECT, "%c", cmd);
     	
-    	if (cmd[0] == 'C')
+    	if (cmd[0] == 'G' or cmd[0] == 'g')
+    		proceed CHANGE_GID_PROMPT;
+    	else if (cmd[0] == 'N' or cmd[0] == 'n')
     		proceed CHANGE_NID_PROMPT;
-    	else if (cmd[0] == 'D')
-    		proceed DIRECT;
-    	else if (cmd[0] == 'B')
-    		proceed BROADCAST_BUILD;
+    	else if (cmd[0] == 'F' or cmd[0] == 'f')
+    		proceed FIND_PROTOCOL;
+    	else if (cmd[0] == 'C' or cmd[0] == 'c')
+    		proceed PLACEHOLDER;
+        else if (cmd[0] == 'D' or cmd[0] == 'd')
+        	proceed PLACEHOLDER;
+        else if (cmd[0] == 'R' or cmd[0] == 'r')
+        	proceed PLACEHOLDER;
+	else if (cmd[0] == 'S' or cmd[0] == 's')
+		proceed PLACEHOLDER;
+	else if (cmd[0] == 'E' or cmd[0] == 'e')
+		proceed PLACEHOLDER;
     	else
     		proceed INPUT_ERROR;
+    		
+    // Bad user input
+    state INPUT_ERROR:
+    	ser_out(INPUT_ERROR, "Invalid command\r\n");
+    	proceed MENU;
+    		
+/********************** Change Group & Node ID States ************************/
+    		
+    // Change Group ID states
+    state CHANGE_GID_PROMPT:
+    	ser_out(CHANGE_GID_PROMPT, "New Group ID (1-16): ");
+    	
+    // Parse user input for Group ID
+    state CHANGE_GID:
+    	char temp_id[4];
+    	ser_inf(CHANGE_GID, "%d", temp_id);
+    	if ((temp_id[0] > 0) && (temp_id[0] < 17)){
+    		group_id = temp_id[0];
+    		proceed MENU;
+    		}
+    	else
+    		proceed CHANGE_GID_PROMPT;
     		
     // Change Node ID states
     state CHANGE_NID_PROMPT:
@@ -196,7 +238,32 @@ fsm root {
     	else
     		proceed CHANGE_NID_PROMPT;
     
-    /* Transmission States */
+/**************************** Find Protocol States ***************************/
+
+//TODO: Make states
+
+/************************** Create Protocol States ***************************/
+
+//TODO: Make states
+
+/************************** Delete Protocol States ***************************/
+
+//TODO: Make states
+
+/************************ Retrieve Protocol States ***************************/
+
+//TODO: Make states
+
+/**************************** Show Record States *****************************/
+
+//TODO: Make states
+
+/*************************** Clear Record States *****************************/
+    
+//TODO: Make states
+    
+    
+/*** Transmission States OLD CODE FOR REFERENCE. REMOVE BEFORE SUBMISSION ****/
     	
     // For Direct Messages
     state DIRECT:
@@ -265,8 +332,10 @@ fsm root {
         ufree(payload); // Free up malloc'd space for sent packet
         proceed MENU;
     	
-    // Bad user input
-    state INPUT_ERROR:
-    	ser_out(INPUT_ERROR, "Invalid command\r\n");
-    	proceed MENU;
+/************************ END OF REFERENCE STATES ****************************/
+    	
+   // temp placeholder (TODO: REMOVE BEFORE SUBMITTING)
+   state PLACEHOLDER;
+   	ser_out(PLACEHOLDER, "Placeholder, please finish me\r\n");
+   	proceed MENU;
 }
