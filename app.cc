@@ -16,16 +16,21 @@
 
 #define CC1350_BUF_SZ	250
 
+
+
+/*********************** Global Variables and Structs ************************/
+
 /* session descriptor for the single VNETI session */
 int sfd;
 
-/* Globals for message transmissions */
+/* IDs etc for messages */
 int group_id = 3;
 int node_id = 1;
 int seq_num = 0;
 long int send_header = 0;
 long int rcv_header = 0;
 
+// Packet Struct
 struct pkt_struct {
   byte group_id;
   byte type;
@@ -39,6 +44,8 @@ struct pkt_struct {
 
 pkt_struct send_pkt;
 pkt_struct rcv_pkt; 
+
+/*************************** Conversion Functions ****************************/
 
 // Convert info from pkt_struct into packet header
 void make_header(){
@@ -108,7 +115,7 @@ int unpack_header(){
 }
 
 
-/* Receiving FSM; runs concurrently to root */
+/********************* Receiver FSM, concurrent to root **********************/
 fsm receiver {
     address packet; //received packets
     
@@ -153,7 +160,7 @@ fsm root {
         tcv_control(sfd, PHYSOPT_ON, NULL);
         runfsm receiver;
 	
-    // User menu and selection states
+/********************** User menu and selection states ***********************/
     state MENU:
 	ser_outf (MENU, 
 		"\r\nGroup %d Device #%d (%d/%d records)\r\n"
@@ -179,7 +186,7 @@ fsm root {
     	else if (cmd[0] == 'N' or cmd[0] == 'n')
     		proceed CHANGE_NID_PROMPT;
     	else if (cmd[0] == 'F' or cmd[0] == 'f')
-    		proceed BROADCAST_BUILD;
+    		proceed FIND_PROTOCOL;
     	else if (cmd[0] == 'C' or cmd[0] == 'c')
     		proceed PLACEHOLDER;
         else if (cmd[0] == 'D' or cmd[0] == 'd')
@@ -193,6 +200,12 @@ fsm root {
     	else
     		proceed INPUT_ERROR;
     		
+    // Bad user input
+    state INPUT_ERROR:
+    	ser_out(INPUT_ERROR, "Invalid command\r\n");
+    	proceed MENU;
+    		
+/********************** Change Group & Node ID States ************************/
     		
     // Change Group ID states
     state CHANGE_GID_PROMPT:
@@ -225,7 +238,9 @@ fsm root {
     		proceed CHANGE_NID_PROMPT;
     
     
-    /* Transmission States */
+
+    
+/*** Transmission States OLD CODE FOR REFERENCE. REMOVE BEFORE SUBMISSION ****/
     	
     // For Direct Messages
     state DIRECT:
@@ -294,8 +309,10 @@ fsm root {
         ufree(payload); // Free up malloc'd space for sent packet
         proceed MENU;
     	
-    // Bad user input
-    state INPUT_ERROR:
-    	ser_out(INPUT_ERROR, "Invalid command\r\n");
-    	proceed MENU;
+/************************ END OF REFERENCE STATES ****************************/
+    	
+   // temp placeholder (TODO: REMOVE BEFORE SUBMITTING)
+   state PLACEHOLDER;
+   	ser_out(PLACEHOLDER, "Placeholder, please finish me\r\n");
+   	proceed MENU;
 }
