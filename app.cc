@@ -136,13 +136,14 @@ fsm receiver {
     
     // Get packet
     state Receiving:
-    	diag("Got a packet\r\n");
         packet = tcv_rnp(Receiving,sfd);
+        diag("Got a packet\r\n");
 
     // If packet properly received
     state OK:
     	// Cast packet into readable structure
         check = unpack_header(rcv_pkt, packet+1);
+        diag("checked group ID\r\n");
         
         // Check if correct group ID, return if wrong
         if (check != 0)
@@ -151,7 +152,7 @@ fsm receiver {
         	
         // Discovery Request
         if (rcv_pkt->type == 0){
-            
+            diag("building a little thinggyyyy\r\n");
             // Build Response
 	    disc_res = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
 	    disc_res->group_id = group_id;
@@ -161,6 +162,7 @@ fsm receiver {
 	    disc_res->receiver_id = 0;
 	    	
 	    // Finish building discovery response packet and send off
+	    diag("trying to send off a response\r\n");
 	    packet = tcv_wnp(OK, sfd, 32);
 	    make_header(disc_res, packet+1);
 	    tcv_endp(packet);
