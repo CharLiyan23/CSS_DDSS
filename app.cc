@@ -136,6 +136,7 @@ fsm receiver {
     
     // Get packet
     state Receiving:
+    	diag("Got a packet\r\n");
         packet = tcv_rnp(Receiving,sfd);
 
     // If packet properly received
@@ -145,7 +146,8 @@ fsm receiver {
         
         // Check if correct group ID, return if wrong
         if (check != 0)
-        	return;
+        	diag("Bad group ID\r\n");
+        	proceed Receiving;
         	
         // Discovery Request
         if (rcv_pkt->type == 0){
@@ -162,12 +164,14 @@ fsm receiver {
 	    packet = tcv_wnp(OK, sfd, 32);
 	    make_header(disc_res, packet+1);
 	    tcv_endp(packet);
+	    diag("sent off a response\r\n");
 	    ufree(disc_res); // Free up malloc'd space for sent packet
 	}
         	
         // Discovery Response
         else if (rcv_pkt->type == 1){
            // Record response
+           diag("yo its a discovery response\r\n");
            int neighs = strlen(neighbours);
            neighbours[neighs] = rcv_pkt->sender_id;
         }
@@ -299,6 +303,7 @@ fsm root {
 
     // Print results
     state FIND_PRINT:
+    	diag (neighbours);
     	if (strlen(neighbours) > 0){
     	ser_outf(FIND_PRINT, "%s\r\n", neighbours);
     	}
