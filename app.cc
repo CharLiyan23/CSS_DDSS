@@ -107,7 +107,7 @@ int unpack_header(struct pkt_struct * rcv_pkt, address pk){
 	
 	// Decode Group ID
 	long int gid_mask = 	0b11110000000000000000000000000000;
-	rcv_pkt->group_id = (rcv_header ^ gid_mask) >> 28;
+	rcv_pkt->group_id = (rcv_header & gid_mask) >> 28;
 	
 	if (rcv_pkt->group_id != group_id)
 		return 1;
