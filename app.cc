@@ -159,20 +159,20 @@ fsm receiver {
         // Discovery Request
         if (rcv_pkt->type == 0){
             // Build Response
-   disc_res = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
-   disc_res->group_id = group_id;
-   disc_res->type = DISC_RES;
-   disc_res->request_num = rcv_pkt->request_num;
-   disc_res->sender_id = node_id;
-   disc_res->receiver_id = 0;
+	   disc_res = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
+	   disc_res->group_id = group_id;
+	   disc_res->type = DISC_RES;
+	   disc_res->request_num = rcv_pkt->request_num;
+	   disc_res->sender_id = node_id;
+	   disc_res->receiver_id = 0;
    
-   // Finish building discovery response packet and send off
-   packet = tcv_wnp(OK, sfd, 32);
-   make_header(disc_res, packet+1);
-   tcv_endp(packet);
-   ufree(rcv_pkt);
-   ufree(disc_res); // Free up malloc'd space for sent packet
-}
+	   // Finish building discovery response packet and send off
+	   packet = tcv_wnp(OK, sfd, 32);
+	   make_header(disc_res, packet+1);
+	   tcv_endp(packet);
+	   ufree(rcv_pkt);
+	   ufree(disc_res); // Free up malloc'd space for sent packet
+	}
        
         // Discovery Response
         else if (rcv_pkt->type == 1){
@@ -326,6 +326,6 @@ fsm root {
    
    // temp placeholder (TODO: REMOVE BEFORE SUBMITTING)
    state PLACEHOLDER:
-    ser_out(PLACEHOLDER, "Placeholder, please finish me\r\n");
-    proceed MENU;
-}
+	    ser_out(PLACEHOLDER, "Placeholder, please finish me\r\n");
+	    proceed MENU;
+	}
