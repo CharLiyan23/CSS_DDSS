@@ -57,34 +57,45 @@ struct pkt_struct * disc_res;
 
 // Convert info from pkt_struct into packet header
 void make_header(struct pkt_struct * send_pkt, address pk){
+
+	// Reset header
+	send_header = 0;
+
 	// Encode Group ID
-	send_header = send_header ^ send_pkt->group_id;
-	send_header << 3;
+	send_header = send_header | send_pkt->group_id;
+	send_header = send_header << 3;
+	diag("Group: %lu", send_header);
 	
 	// Encode type
-	send_header = send_header ^ send_pkt->type;
-	send_header << 8;
+	send_header = send_header | send_pkt->type;
+	send_header = send_header << 8;
+	diag("after type: %lu", send_header);
 	
 	// Encode Request Number
-	send_header = send_header ^ send_pkt->request_num;
-	send_header << 1;
+	send_header = send_header | send_pkt->request_num;
+	send_header = send_header << 1;
+	diag("after request_num: %lu", send_header);
 	
 	// Encode Padding
-	send_header = send_header ^ send_pkt->pad;
-	send_header << 5;
+	send_header = send_header | send_pkt->pad;
+	send_header = send_header << 5;
+	diag("after padding: %lu", send_header);
 	
 	// Encode Sender ID
-	send_header = send_header ^ send_pkt->sender_id;
-	send_header << 5;
+	send_header = send_header | send_pkt->sender_id;
+	send_header = send_header << 5;
+	diag("after senderID: %lu", send_header);
 	
 	// Encode Receiver ID
-	send_header = send_header ^ send_pkt->receiver_id;
-	send_header << 6;
+	send_header = send_header | send_pkt->receiver_id;
+	send_header = send_header << 6;
+	diag("after receiverID: %lu", send_header);
 	
 	// Encode Record Index or Status
-	send_header = send_header ^ send_pkt->record_status;
+	send_header = send_header | send_pkt->record_status;
 	long int * p = (long int *) pk;
 	*p = send_header;
+	diag("at last: %lu", send_header);
 }
 
 // Cast received header into struct using masks
@@ -103,27 +114,27 @@ int unpack_header(struct pkt_struct * rcv_pkt, address pk){
 	
 	// Decode Type
 	long int type_mask = 	0b00001110000000000000000000000000;
-	rcv_pkt->type = (rcv_header ^ type_mask) >> 25;
+	rcv_pkt->type = (rcv_header & type_mask) >> 25;
 	
 	// Decode Request Number
 	long int request_mask = 0b00000001111111100000000000000000;
-	rcv_pkt->request_num = (rcv_header ^ request_mask) >> 17;
+	rcv_pkt->request_num = (rcv_header & request_mask) >> 17;
 	
 	// Decode Padding
 	long int pad_mask = 	0b00000000000000010000000000000000;
-	rcv_pkt->pad = (rcv_header ^ pad_mask) >> 16;
+	rcv_pkt->pad = (rcv_header & pad_mask) >> 16;
 	
 	// Decode Sender ID
 	long int sid_mask = 	0b00000000000000001111100000000000;
-	rcv_pkt->sender_id = (rcv_header ^ sid_mask) >> 11;
+	rcv_pkt->sender_id = (rcv_header & sid_mask) >> 11;
 	
 	// Decode Receiver ID
 	long int rcv_mask = 	0b00000000000000000000011111000000;
-	rcv_pkt->receiver_id = (rcv_header ^ rcv_mask) >> 6;
+	rcv_pkt->receiver_id = (rcv_header & rcv_mask) >> 6;
 	
 	// Decode Record Index or Status
 	long int stat_mask = 	0b00000000000000000000000000111111;
-	rcv_pkt->record_status = rcv_header ^ stat_mask;
+	rcv_pkt->record_status = rcv_header & stat_mask;
 	
 	return 0;
 }
@@ -290,14 +301,21 @@ fsm root {
     	disc_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
     	disc_req->group_id = group_id;
     	disc_req->type = DISC_REQ; 
-    	disc_req->request_num = 123; //TODO: Randomize
+    	disc_req->request_num = 255; //TODO: Randomize
     	disc_req->sender_id = node_id;
     	disc_req->receiver_id = 0;
+    	disc_req->record_status = 0;
     	
     // Finish building discovery request packet and send off
     state FIND_SEND:
     	packet = tcv_wnp(FIND_SEND, sfd, 32);
     	make_header(disc_req, packet+1);
+    	diag("Group_ID: %d\r\n", disc_req->group_id);
+    	diag("Type: %d\r\n", disc_req->type);
+    	diag("Request_Num: %d\r\n", disc_req->request_num);
+    	diag("Sender: %d\r\n", disc_req->sender_id);
+    	diag("Receiver: %d\r\n", disc_req->receiver_id);
+    	diag("Record Status: %d\r\n", disc_req->record_status);
         tcv_endp(packet);
         ufree(disc_req); // Free up malloc'd space for sent packet
         delay(3*1024, FIND_PRINT);
