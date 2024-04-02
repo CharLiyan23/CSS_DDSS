@@ -49,6 +49,18 @@ struct pkt_struct {
   char message[20];
 };
 
+// Database structs
+struct record{
+	// when create request recieved, the sender of that request is the owner of the record
+	// retrieve sends record back to requester
+	// delete request we would delete the record requested
+	int timeStamp;
+	int ownerID;
+	char payload[20];
+	int entries = 0;
+}
+struct record database[40];
+
 struct pkt_struct * rcv_pkt;
 struct pkt_struct * disc_req;
 struct pkt_struct * disc_res;
@@ -183,9 +195,42 @@ fsm receiver {
         }
        
         // TODO: Figure out what to do with packets based on rest of types
-
+		// if create record on neighbour is received
+		if (rcv_pkt->type == 'C' or rcv_pkt->type == 'c'){
+            	proceed createRecord;
+            }
+		// if destroy record on neighbour is received
+        else if(rcv_pkt->type == 'D' or rcv_pkt->type == 'd'){
+            	proceed deleteRecord;
+            } 
         tcv_endp(packet);
         proceed Receiving;
+
+	state createRecord:
+    	record->ownerID = rcv_pkt->sender_id;
+    	record->payload = rcv_pkt->message;
+    	int timeStamp = lword seconds();
+    	record->timeStamp = timeStamp;
+    	database[record->entries] = record;
+    	
+    	record->entries++;
+    	
+    	// we need to send ack here still
+    	tcv_endp(packet);
+    	proceed Receiving;
+    	
+   	state deleteRecord:
+   		int index = int(rcv_pkt->message[0]) // cast str int
+   		int i;
+   		for (i = index; i < record->entries; i++){
+   			database[i] = database[i+1]; // shift entries to delete
+   		}
+   		// we need to send ack here still
+   		tcv_endp(packet);
+   		proceed Receiving;
+        	// Continue receiving if message is not for this node
+        	//proceed Receiving;
+        
 }
 
 // Main FSM for sending packets
