@@ -13,15 +13,22 @@
 #include "phys_cc1350.h"
 #include "plug_null.h"
 #include "tcv.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "time.h"
+
 
 #define CC1350_BUF_SZ 250
 #define DISC_REQ 0
 #define DISC_RES 1
+
 #define CREATE_REC 2
 #define DELETE_REC 3
 #define GET_REC 4
 #define RES_REC 5
 
+#define MAX_RECORDS 40
+#define RECORD_LENGTH 20
 
 /*********************** Global Variables and Structs ************************/
 
@@ -48,6 +55,21 @@ struct pkt_struct {
   byte record_status;
   char message[20];
 };
+
+// Database structs
+typedef struct{
+	// when create request recieved, the sender of that request is the owner of the record
+	// retrieve sends record back to requester
+	// delete request we would delete the record requested
+	time_t timeStamp;
+	int ownerID;
+	char payload[RECORD_LENGTH];
+}record;
+
+record database[MAX_RECORDS];
+
+// keeps track of record entries
+int entries; 
 
 struct pkt_struct * rcv_pkt;
 struct pkt_struct * disc_req;
@@ -183,9 +205,84 @@ fsm receiver {
         }
        
         // TODO: Figure out what to do with packets based on rest of types
+		// if create record on neighbour is received
+		if (rcv_pkt->type == CREATE_REC){
+            	proceed createRecord;
+            }
+		// if destroy record on neighbour is received
+        else if(rcv_pkt->type == DELETE_REC){
+            	proceed deleteRecord;
+            } 
+		else if(rcv_pkt->type == GET_REC){
+            	proceed getRecord;
+            } 
+		else if(rcv_pkt->type == RES_REC){
+            	proceed responseRecord;
+            } 
+
 
         tcv_endp(packet);
         proceed Receiving;
+
+	state createRecord:
+
+		if (entries >= MAX_RECORDS){
+			ser_outf(createRecord, "\r\n Maximum records reached");
+		}
+		else {
+			database[entries].ownerID = rcv_pkt->sender_id;
+    		strcpy(database[entries].payload, rcv_pkt->message); 
+    		database[entries].timeStamp = time(NULL);
+			entries++;
+			ser_outf(createRecord, "\r\n Data Saved");
+		}    	
+    	
+    	// we need to send ack here still
+    	tcv_endp(packet);
+    	proceed Receiving;
+    	
+   	state deleteRecord:
+
+   		int index = int(rcv_pkt->message[0]) // cast str int
+   		
+		if (entries == 0){
+			ser_outf(deleteRecord, "\r\n No record to delete");
+		}else if(index >= entries) {
+			ser_outf(deleteRecord, "\r\n Does not exist");
+		}else{
+			for (int i = index; i < entries; i++){
+				database[i] = database[i+1]; // shift entries to delete
+   			}
+		}
+   		
+   		// we need to send ack here still
+   		tcv_endp(packet);
+   		proceed Receiving;
+        // Continue receiving if message is not for this node
+        //proceed Receiving;
+
+	state getRecord:
+		int index = int(rcv_pkt->message[0]) // cast str int
+		if (entries == 0){
+			ser_outf(getRecord, "\r\n No record in database");
+		}else if (database[index] == NULL) {
+			ser_outf(getRecord, "\r\n Does not exist");
+		}else{ 
+			ser_outf(getRecord, "\r\n %s GOTTEEEE", database[index].payload); 
+		}
+    	// we need to send ack here still
+    	tcv_endp(packet);
+    	proceed Receiving;
+
+	state responseRecord:
+		if (entries == 0){
+			ser_outf(responseRecord, "\r\n No record in database");
+		}else{ 
+			ser_outf(responseRecord, "\r\n %s", rcv_pkt ->message); 
+		}
+    	// we need to send ack here still
+    	tcv_endp(packet);
+    	proceed Receiving;
 }
 
 // Main FSM for sending packets
