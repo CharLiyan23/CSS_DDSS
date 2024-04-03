@@ -14,8 +14,7 @@
 #include "plug_null.h"
 #include "tcv.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include "time.h"
+#include <time.h>
 
 
 #define CC1350_BUF_SZ 250
@@ -231,7 +230,7 @@ fsm receiver {
 		}
 		else {
 			database[entries].ownerID = rcv_pkt->sender_id;
-    		strcpy(database[entries].payload, rcv_pkt->message); 
+    		strncpy(database[entries].payload, rcv_pkt->message, 20); 
     		database[entries].timeStamp = time(NULL);
 			entries++;
 			ser_outf(createRecord, "\r\n Data Saved");
@@ -243,7 +242,8 @@ fsm receiver {
     	
    	state deleteRecord:
 
-   		int index = int(rcv_pkt->message[0]) // cast str int
+   		int index;
+		index = (int)(rcv_pkt->message[0]); // cast str int
    		
 		if (entries == 0){
 			ser_outf(deleteRecord, "\r\n No record to delete");
@@ -262,10 +262,11 @@ fsm receiver {
         //proceed Receiving;
 
 	state getRecord:
-		int index = int(rcv_pkt->message[0]) // cast str int
+		int index;
+		index = (int)(rcv_pkt->message[0]); // cast str int
 		if (entries == 0){
 			ser_outf(getRecord, "\r\n No record in database");
-		}else if (database[index] == NULL) {
+		}else if (database[index].ownerID == NULL) {
 			ser_outf(getRecord, "\r\n Does not exist");
 		}else{ 
 			ser_outf(getRecord, "\r\n %s GOTTEEEE", database[index].payload); 
