@@ -93,7 +93,7 @@ fsm receiver {
         }
         
         // Check if correct node ID (itself or 0), return /ignore if wrong
-        if ((rcv_pkt->receiver_id != node_id) && (rcv_pkt->receiver_id != 0){
+        if ((rcv_pkt->receiver_id != node_id) && (rcv_pkt->receiver_id != 0)){
 	    proceed Receiving;
         }
        
@@ -125,7 +125,7 @@ fsm receiver {
 	   tcv_endp(packet);
 	   ufree(rcv_pkt);
 	   ufree(disc_res); // Free up malloc'd space for sent packet
-	   neighbours = ""; // Reset neighbours array 
+	   memset(neighbours, 0, sizeof(neighbours));; // Reset neighbours array 
 	   proceed Receiving;
 	}
        
