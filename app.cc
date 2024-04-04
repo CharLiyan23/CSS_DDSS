@@ -75,8 +75,10 @@ struct pkt_struct * disc_res;
 // TODO: NOT DONE. See below.
 fsm receiver {
     address packet; //received packets
+
     address packet_res; //to build responses
-    struct pkt_struct * rcv_pkt;
+
+	struct pkt_struct * rcv_pkt;
    
     // Get packet
     state Receiving:
