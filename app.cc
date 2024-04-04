@@ -6,6 +6,10 @@
  * Distributed Database
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
 #include "sysio.h"
 #include "serf.h"
 #include "ser.h"
@@ -13,8 +17,6 @@
 #include "phys_cc1350.h"
 #include "plug_null.h"
 #include "tcv.h"
-#include <stdio.h>
-#include "time.h"
 
 
 #define CC1350_BUF_SZ 250
@@ -66,11 +68,14 @@ record database[MAX_RECORDS];
 // keeps track of record entries
 
 int entries;
+int currRec= 0;
 
 struct pkt_struct * disc_req;
 struct pkt_struct * disc_res;
 struct pkt_struct * create_req;
 struct pkt_struct * delete_req;
+struct pkt_struct * send_req;
+int curr_store = 0;
 
 
 
@@ -141,7 +146,7 @@ fsm receiver {
         
 // TODO: Figure out what to do with packets based on rest of types
 	// if create record on neighbour is received
-	if (rcv_pkt->type == CREATE_REC){
+	else if (rcv_pkt->type == CREATE_REC){
             proceed createRecord;
         }
 	// if destroy record on neighbour is received
@@ -163,13 +168,14 @@ fsm receiver {
 	if (entries >= MAX_RECORDS){
 		ser_outf(createRecord, "\r\n Maximum records reached");
 	}
-	else {
-	database[entries].ownerID = rcv_pkt->sender_id;
-    strncpy(database[entries].payload, rcv_pkt->message, 20); 
 
-	database[entries].timeStamp = time(NULL);
-	    entries++;
-	    ser_outf(createRecord, "\r\n Data Saved");
+	else {
+		database[entries].ownerID = rcv_pkt->sender_id;
+    	strncpy(database[entries].payload, rcv_pkt->message, 20); 
+		database[entries].timeStamp = time(NULL);
+		entries++;
+		curr_store++;
+		ser_outf(createRecord, "\r\n Data Saved");
 	}    	
 
 	// we need to send ack here still
@@ -186,8 +192,11 @@ fsm receiver {
 		ser_outf(deleteRecord, "\r\n Does not exist");
 	}else{
 		for (int i = index; i < entries; i++){
+
 		database[i] = database[i+1]; // shift entries to delete
    		}
+		entries--;
+		curr_store--;
 	}
 
    	// we need to send ack here still
@@ -226,7 +235,7 @@ fsm receiver {
 // Main FSM for sending packets
 fsm root {
     char msg_string[20];
-    int curr_store = 0;
+    
     int total_store = 40;
     address packet;    
 
@@ -274,11 +283,11 @@ fsm root {
     	else if ((cmd[0] == 'C') || (cmd[0] == 'c'))
    			proceed PRINT_REC_ID;
     	else if ((cmd[0] == 'D' || cmd[0] == 'd'))
-			proceed DELETE_RECORD;
+			proceed PRINT_REC_ID2;
 		else if ((cmd[0] == 'R') || (cmd[0] == 'r'))
 			proceed PLACEHOLDER;
 		else if ((cmd[0] == 'S') || (cmd[0] == 's'))
-			proceed PLACEHOLDER;
+			proceed SHOW_RECORD;
 		else if ((cmd[0] == 'E') || (cmd[0] == 'e'))
 			proceed PLACEHOLDER;
 		else
@@ -328,7 +337,7 @@ fsm root {
 	disc_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
 	disc_req->group_id = group_id;
 	disc_req->type = DISC_REQ;
-	disc_req->request_num = 255; //TODO: Randomize
+	disc_req->request_num = rand() % 255; 
 	disc_req->pad = 0;
 	disc_req->sender_id = node_id;
 	disc_req->receiver_id = 0;
@@ -372,7 +381,7 @@ fsm root {
 		create_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
 		create_req->group_id = group_id;
 		create_req->type = CREATE_REC;
-		create_req->request_num = 255; //TODO: Randomize
+		create_req->request_num = rand() % 255; 
 		create_req->pad = 0;
 		create_req->sender_id = node_id;
 		ser_inf(CREATE_RECORD, "%d", rec_id);
@@ -381,6 +390,9 @@ fsm root {
 
 	state PRINT_REC_ID_MESSAGE:
 		ser_out(PRINT_REC_ID_MESSAGE, "Message: \r\n");
+
+	state PRINT_REC_ID_MESSAGE2:
+		ser_in(PRINT_REC_ID_MESSAGE2, create_req->message, 20);
 
     // Finish building create request packet and send off
     state CREATE_SEND:
@@ -394,7 +406,7 @@ fsm root {
 		*p = create_req->sender_id; p++;
 		*p = create_req->receiver_id; p++;
 		*p = create_req->record_status; p++;
-		ser_in(CREATE_SEND, create_req->message, 20);
+		// ser_in(CREATE_SEND, create_req->message, 20);
 		
 		strcat(p, create_req->message);
 	
@@ -405,16 +417,26 @@ fsm root {
 
 
     /**************************** Delete Protocol States ***************************/
+	state PRINT_REC_ID2:
+		ser_out(PRINT_REC_ID2, "Delete rec_id\r\n");
+		proceed DELETE_RECORD;
+		
 	state DELETE_RECORD:
 		delete_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
 		delete_req->group_id = group_id;
 		delete_req->type = DELETE_REC;
-		delete_req->request_num = 255; //TODO: Randomize
+		delete_req->request_num = rand() % 255; 
 		delete_req->pad = 0;
 		delete_req->sender_id = node_id;
 		ser_inf(DELETE_RECORD, "%d", rec_id);
 		delete_req->receiver_id = rec_id;
 		delete_req->record_status = 0;
+
+	state PRINT_DELETE_ID_MESSAGE:
+		ser_out(PRINT_DELETE_ID_MESSAGE, "Message: \r\n");
+
+	state PRINT_DELETE_ID_MESSAGE2:
+		ser_in(PRINT_DELETE_ID_MESSAGE2, delete_req->message, 20);
 
 	   
     // Finish building create request packet and send off
@@ -430,7 +452,7 @@ fsm root {
 		*p = delete_req->sender_id; p++;
 		*p = delete_req->receiver_id; p++;
 		*p = delete_req->record_status; p++;
-		ser_inf(DELETE_SEND, "%s", delete_req->message);
+		// ser_inf(DELETE_SEND, "%s", delete_req->message);
 		strcat(p, delete_req->message);
 	
 		tcv_endp(packet);
@@ -439,8 +461,28 @@ fsm root {
 		proceed MENU;
 
     /**************************** Retrieve Protocol States ***************************/
+	
 
     /**************************** Show Protocol States ***************************/
+
+	state SHOW_RECORDS:
+		currRec =0; 
+
+		if (entries >0) {
+			ser_outf(SHOW_RECORDS,"Index\tTime Stamp\towner ID\tRecord Data\r\n");
+		}else{
+			ser_outf(SHOW_RECORDS,"No Records to display\r\n");
+			proceed MENU;
+		}
+	state SHOW_RECORD:
+		if ( currRec <entries){
+			ser_outf(SHOW_RECORD,"%d\t%ld\t%d\t%s\r\n", currRec, database[currRec].timeStamp, database[currRec].ownerID, database[currRec].payload);
+		}else{
+			proceed MENU;
+		}
+		currRec++;
+		proceed SHOW_RECORDS;
+
 
     /**************************** Reset Protocol States ***************************/
 
