@@ -160,6 +160,7 @@ fsm receiver {
 	else {
 	database[entries].ownerID = rcv_pkt->sender_id;
     strncpy(database[entries].payload, rcv_pkt->message, 20); 
+
 	database[entries].timeStamp = time(NULL);
 	    entries++;
 	    ser_outf(createRecord, "\r\n Data Saved");
@@ -170,8 +171,7 @@ fsm receiver {
 	    proceed Receiving;
 
    state deleteRecord:
-   
-
+  
 	  int index = (int)(rcv_pkt->message[0]); // cast str int
 
 	if (entries == 0){
