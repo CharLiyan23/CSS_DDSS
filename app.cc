@@ -125,6 +125,7 @@ fsm receiver {
 	   tcv_endp(packet);
 	   ufree(rcv_pkt);
 	   ufree(disc_res); // Free up malloc'd space for sent packet
+	   neighbours = ""; // Reset neighbours array 
 	   proceed Receiving;
 	}
        
