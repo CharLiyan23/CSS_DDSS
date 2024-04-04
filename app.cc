@@ -172,7 +172,7 @@ fsm receiver {
    state deleteRecord:
    
 
-	int index = (int)(rcv_pkt->message[0]); // cast str int
+	  int index = (int)(rcv_pkt->message[0]); // cast str int
 
 	if (entries == 0){
 		ser_outf(deleteRecord, "\r\n No record to delete");
