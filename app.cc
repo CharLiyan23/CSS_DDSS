@@ -86,6 +86,7 @@ fsm receiver {
     address packet; //received packets
 
     address packet_res; //to build responses
+
 	struct pkt_struct * rcv_pkt;
    
     // Get packet
@@ -97,9 +98,13 @@ fsm receiver {
         // Cast packet into readable structure
         rcv_pkt = (struct pkt_struct *)(packet+1);
        
-        // Check if correct group ID, return if wrong
+        // Check if correct group ID, return / ignore if wrong
         if (rcv_pkt->group_id != group_id){
-	    diag("Bad group ID\r\n");
+	    proceed Receiving;
+        }
+        
+        // Check if correct node ID (itself or 0), return /ignore if wrong
+        if ((rcv_pkt->receiver_id != node_id) && (rcv_pkt->receiver_id != 0)){
 	    proceed Receiving;
         }
        
@@ -131,6 +136,7 @@ fsm receiver {
 	   tcv_endp(packet);
 	   ufree(rcv_pkt);
 	   ufree(disc_res); // Free up malloc'd space for sent packet
+	   memset(neighbours, 0, sizeof(neighbours));; // Reset neighbours array 
 	   proceed Receiving;
 	}
        
@@ -139,7 +145,7 @@ fsm receiver {
            // Record response
            int neighs = strlen(neighbours);
            neighbours[neighs] = rcv_pkt->sender_id;
-           neighs++;
+           ufree(rcv_pkt);
            tcv_endp(packet);
            proceed Receiving;
         }
@@ -188,9 +194,11 @@ fsm receiver {
 
 	if (entries == 0){
 		ser_outf(deleteRecord, "\r\n No record to delete");
-	}else if(index >= entries) {
+	}
+	else if(index >= entries) {
 		ser_outf(deleteRecord, "\r\n Does not exist");
-	}else{
+	}
+	else{
 		for (int i = index; i < entries; i++){
 
 		database[i] = database[i+1]; // shift entries to delete
@@ -366,7 +374,7 @@ fsm root {
     // Print results
     state FIND_PRINT:
     	if (strlen(neighbours) > 0){
-    	     ser_outf(FIND_PRINT, "%s\r\n", neighbours);
+    	     ser_outf(FIND_PRINT, "Neighbours: %s\r\n", neighbours);
     	     proceed MENU;
     	}
     	else
