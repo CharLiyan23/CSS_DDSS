@@ -14,7 +14,7 @@
 #include "plug_null.h"
 #include "tcv.h"
 #include <stdio.h>
-#include <time.h>
+#include "time.h"
 
 
 #define CC1350_BUF_SZ 250
@@ -171,9 +171,8 @@ fsm receiver {
 
    state deleteRecord:
    
-    int index;
 
-	index = (int)(rcv_pkt->message[0]); // cast str int
+	int index = (int)(rcv_pkt->message[0]); // cast str int
 
 	if (entries == 0){
 		ser_outf(deleteRecord, "\r\n No record to delete");
