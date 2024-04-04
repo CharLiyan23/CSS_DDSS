@@ -75,7 +75,9 @@ struct pkt_struct * disc_res;
 // TODO: NOT DONE. See below.
 fsm receiver {
     address packet; //received packets
+
     address packet_res; //to build responses
+	struct pkt_struct * rcv_pkt;
    
     // Get packet
     state Receiving:
@@ -84,7 +86,7 @@ fsm receiver {
     // If packet properly received
     state OK:
         // Cast packet into readable structure
-        struct pkt_struct * rcv_pkt = (struct pkt_struct *)(packet+1);
+        rcv_pkt = (struct pkt_struct *)(packet+1);
        
         // Check if correct group ID, return if wrong
         if (rcv_pkt->group_id != group_id){
@@ -160,6 +162,7 @@ fsm receiver {
 	else {
 	database[entries].ownerID = rcv_pkt->sender_id;
     strncpy(database[entries].payload, rcv_pkt->message, 20); 
+
 	database[entries].timeStamp = time(NULL);
 	    entries++;
 	    ser_outf(createRecord, "\r\n Data Saved");
@@ -170,8 +173,7 @@ fsm receiver {
 	    proceed Receiving;
 
    state deleteRecord:
-   
-
+  
 	  int index = (int)(rcv_pkt->message[0]); // cast str int
 
 	if (entries == 0){
@@ -193,7 +195,8 @@ fsm receiver {
 
 	state getRecord:
 		int index;
-		index = (int)(rcv_pkt->message[0]); // cast str int		if (entries == 0){
+		index = (int)(rcv_pkt->message[0]); // cast str int		
+		if (entries == 0){
 			ser_outf(getRecord, "\r\n No record in database");
 		}else if (database[index].ownerID == NULL) {
 			ser_outf(getRecord, "\r\n Does not exist");
