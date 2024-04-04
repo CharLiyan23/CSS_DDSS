@@ -87,9 +87,13 @@ fsm receiver {
         // Cast packet into readable structure
         rcv_pkt = (struct pkt_struct *)(packet+1);
        
-        // Check if correct group ID, return if wrong
+        // Check if correct group ID, return / ignore if wrong
         if (rcv_pkt->group_id != group_id){
-	    diag("Bad group ID\r\n");
+	    proceed Receiving;
+        }
+        
+        // Check if correct node ID (itself or 0), return /ignore if wrong
+        if ((rcv_pkt->receiver_id != node_id) && (rcv_pkt->receiver_id != 0){
 	    proceed Receiving;
         }
        
