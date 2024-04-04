@@ -37,6 +37,7 @@ int sfd;
 /* IDs etc for messages */
 int group_id = 3;
 int node_id = 1;
+char rec_id[4];
 char neighbours[10];
 
 // Packet Struct
@@ -68,6 +69,9 @@ int entries;
 
 struct pkt_struct * disc_req;
 struct pkt_struct * disc_res;
+struct pkt_struct * create_req;
+struct pkt_struct * delete_req;
+
 
 
 
@@ -261,29 +265,29 @@ fsm root {
     	char cmd[4];
     	ser_inf(SELECT, "%c", cmd);
    	
-   	if ((cmd[0] == 'G') || (cmd[0] == 'g'))
+   		if ((cmd[0] == 'G') || (cmd[0] == 'g'))
     		proceed CHANGE_GID_PROMPT;
     	else if ((cmd[0] == 'N') || (cmd[0] == 'n'))
     		proceed CHANGE_NID_PROMPT;
     	else if ((cmd[0] == 'F') || (cmd[0] == 'f'))
     		proceed FIND_PROTOCOL;
     	else if ((cmd[0] == 'C') || (cmd[0] == 'c'))
-   		proceed PLACEHOLDER;
+   			proceed PRINT_REC_ID;
     	else if ((cmd[0] == 'D' || cmd[0] == 'd'))
-		proceed PLACEHOLDER;
-	else if ((cmd[0] == 'R') || (cmd[0] == 'r'))
-		proceed PLACEHOLDER;
-	else if ((cmd[0] == 'S') || (cmd[0] == 's'))
-		proceed PLACEHOLDER;
-	else if ((cmd[0] == 'E') || (cmd[0] == 'e'))
-		proceed PLACEHOLDER;
-	else
+			proceed DELETE_RECORD;
+		else if ((cmd[0] == 'R') || (cmd[0] == 'r'))
+			proceed PLACEHOLDER;
+		else if ((cmd[0] == 'S') || (cmd[0] == 's'))
+			proceed PLACEHOLDER;
+		else if ((cmd[0] == 'E') || (cmd[0] == 'e'))
+			proceed PLACEHOLDER;
+		else
     		proceed INPUT_ERROR;
    
-    // Bad user input
-    state INPUT_ERROR:
-	ser_out(INPUT_ERROR, "Invalid command\r\n");
-	proceed MENU;
+		// Bad user input
+    	state INPUT_ERROR:
+		ser_out(INPUT_ERROR, "Invalid command\r\n");
+		proceed MENU;
    
 /********************** Change Group & Node ID States ************************/
    
@@ -359,7 +363,88 @@ fsm root {
     	else
     	     ser_out(FIND_PRINT, "No neighbours\r\n");
              proceed MENU;
-   
+    /**************************** Create Protocol States ***************************/
+	state PRINT_REC_ID:
+		ser_out(PRINT_REC_ID, "Send rec_id\r\n");
+		proceed CREATE_RECORD;
+
+	state CREATE_RECORD:
+		create_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
+		create_req->group_id = group_id;
+		create_req->type = CREATE_REC;
+		create_req->request_num = 255; //TODO: Randomize
+		create_req->pad = 0;
+		create_req->sender_id = node_id;
+		ser_inf(CREATE_RECORD, "%d", rec_id);
+		create_req->receiver_id = rec_id[0];
+		create_req->record_status = 0;
+
+	state PRINT_REC_ID_MESSAGE:
+		ser_out(PRINT_REC_ID_MESSAGE, "Message: \r\n");
+
+    // Finish building create request packet and send off
+    state CREATE_SEND:
+		packet = tcv_wnp(CREATE_SEND, sfd, 30);
+		packet[0] = 0;
+		char *p = (char *)(packet+1);
+		*p = create_req->group_id; p++;
+		*p = create_req->type; p++;
+		*p = create_req->request_num; p++;
+		*p = create_req->pad; p++;
+		*p = create_req->sender_id; p++;
+		*p = create_req->receiver_id; p++;
+		*p = create_req->record_status; p++;
+		ser_in(CREATE_SEND, create_req->message, 20);
+		
+		strcat(p, create_req->message);
+	
+		tcv_endp(packet);
+		ufree(create_req); // Free up malloc'd space for sent packet
+		
+		proceed MENU;
+
+
+    /**************************** Delete Protocol States ***************************/
+	state DELETE_RECORD:
+		delete_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
+		delete_req->group_id = group_id;
+		delete_req->type = DELETE_REC;
+		delete_req->request_num = 255; //TODO: Randomize
+		delete_req->pad = 0;
+		delete_req->sender_id = node_id;
+		ser_inf(DELETE_RECORD, "%d", rec_id);
+		delete_req->receiver_id = rec_id;
+		delete_req->record_status = 0;
+
+	   
+    // Finish building create request packet and send off
+    state DELETE_SEND:
+    	diag("packaging");
+		packet = tcv_wnp(DELETE_SEND, sfd, 30);
+		packet[0] = 0;
+		char *p = (char *)(packet+1);
+		*p = delete_req->group_id; p++;
+		*p = delete_req->type; p++;
+		*p = delete_req->request_num; p++;
+		*p = delete_req->pad; p++;
+		*p = delete_req->sender_id; p++;
+		*p = delete_req->receiver_id; p++;
+		*p = delete_req->record_status; p++;
+		ser_inf(DELETE_SEND, "%s", delete_req->message);
+		strcat(p, delete_req->message);
+	
+		tcv_endp(packet);
+		ufree(delete_req); // Free up malloc'd space for sent packet
+		
+		proceed MENU;
+
+    /**************************** Retrieve Protocol States ***************************/
+
+    /**************************** Show Protocol States ***************************/
+
+    /**************************** Reset Protocol States ***************************/
+
+
    // temp placeholder (TODO: REMOVE BEFORE SUBMITTING)
    state PLACEHOLDER:
     ser_out(PLACEHOLDER, "Placeholder, please finish me\r\n");
