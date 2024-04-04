@@ -76,6 +76,7 @@ struct pkt_struct * disc_res;
 fsm receiver {
     address packet; //received packets
     address packet_res; //to build responses
+    struct pkt_struct * rcv_pkt;
    
     // Get packet
     state Receiving:
@@ -84,7 +85,7 @@ fsm receiver {
     // If packet properly received
     state OK:
         // Cast packet into readable structure
-        struct pkt_struct * rcv_pkt = (struct pkt_struct *)(packet+1);
+        rcv_pkt = (struct pkt_struct *)(packet+1);
        
         // Check if correct group ID, return if wrong
         if (rcv_pkt->group_id != group_id){
@@ -128,14 +129,14 @@ fsm receiver {
            // Record response
            int neighs = strlen(neighbours);
            neighbours[neighs] = rcv_pkt->sender_id;
-           neighs++;
+           ufree(rcv_pkt);
            tcv_endp(packet);
            proceed Receiving;
         }
         
 // TODO: Figure out what to do with packets based on rest of types
 	// if create record on neighbour is received
-	if (rcv_pkt->type == CREATE_REC){
+	else if (rcv_pkt->type == CREATE_REC){
             proceed createRecord;
         }
 	// if destroy record on neighbour is received
@@ -157,9 +158,11 @@ fsm receiver {
 	if (entries >= MAX_RECORDS){
 		ser_outf(createRecord, "\r\n Maximum records reached");
 	}
+	
 	else {
 	database[entries].ownerID = rcv_pkt->sender_id;
-    strncpy(database[entries].payload, rcv_pkt->message, 20); 
+	
+    	strncpy(database[entries].payload, rcv_pkt->message, 20); 
 
 	database[entries].timeStamp = time(NULL);
 	    entries++;
@@ -176,9 +179,11 @@ fsm receiver {
 
 	if (entries == 0){
 		ser_outf(deleteRecord, "\r\n No record to delete");
-	}else if(index >= entries) {
+	}
+	else if(index >= entries) {
 		ser_outf(deleteRecord, "\r\n Does not exist");
-	}else{
+	}
+	else{
 		for (int i = index; i < entries; i++){
 		database[i] = database[i+1]; // shift entries to delete
    		}
@@ -193,7 +198,8 @@ fsm receiver {
 
 	state getRecord:
 		int index;
-		index = (int)(rcv_pkt->message[0]); // cast str int		if (entries == 0){
+		index = (int)(rcv_pkt->message[0]); // cast str int		
+		if (entries == 0){
 			ser_outf(getRecord, "\r\n No record in database");
 		}else if (database[index].ownerID == NULL) {
 			ser_outf(getRecord, "\r\n Does not exist");
@@ -350,7 +356,7 @@ fsm root {
     // Print results
     state FIND_PRINT:
     	if (strlen(neighbours) > 0){
-    	     ser_outf(FIND_PRINT, "%s\r\n", neighbours);
+    	     ser_outf(FIND_PRINT, "Neighbours: %s\r\n", neighbours);
     	     proceed MENU;
     	}
     	else
