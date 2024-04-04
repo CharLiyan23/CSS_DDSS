@@ -14,7 +14,6 @@
 #include "plug_null.h"
 #include "tcv.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include "time.h"
 
 
@@ -38,11 +37,7 @@ int sfd;
 /* IDs etc for messages */
 int group_id = 3;
 int node_id = 1;
-int seq_num = 0;
-int check;
 char neighbours[10];
-long int send_header = 0;
-long int rcv_header = 0;
 
 // Packet Struct
 struct pkt_struct {
@@ -56,111 +51,15 @@ struct pkt_struct {
   char message[20];
 };
 
-// Database structs
-typedef struct{
-	// when create request recieved, the sender of that request is the owner of the record
-	// retrieve sends record back to requester
-	// delete request we would delete the record requested
-	time_t timeStamp;
-	int ownerID;
-	char payload[RECORD_LENGTH];
-}record;
 
-record database[MAX_RECORDS];
-
-// keeps track of record entries
-int entries; 
-
-struct pkt_struct * rcv_pkt;
 struct pkt_struct * disc_req;
 struct pkt_struct * disc_res;
-
-/*************************** Conversion Functions ****************************/
-
-// Convert info from pkt_struct into packet header
-void make_header(struct pkt_struct * send_pkt, address pk){
-
-	// Reset header, allocate space for struct
-	send_header = 0;
-
-	// Encode Group ID
-	send_header = send_header | send_pkt->group_id;
-	send_header = send_header << 3;
-
-	// Encode type
-	send_header = send_header | send_pkt->type;
-	send_header = send_header << 8;
-
-	// Encode Request Number
-	send_header = send_header | send_pkt->request_num;
-	send_header = send_header << 1;
-
-	// Encode Padding
-	send_header = send_header | send_pkt->pad;
-	send_header = send_header << 5;
-
-	// Encode Sender ID
-	send_header = send_header | send_pkt->sender_id;
-	send_header = send_header << 5;
-
-	// Encode Receiver ID
-	send_header = send_header | send_pkt->receiver_id;
-	send_header = send_header << 6;
-
-	// Encode Record Index or Status
-	send_header = send_header | send_pkt->record_status;
-	long int * p = (long int *) pk;
-	*p = send_header;
-	}
-
-// Cast received header into struct using masks
-// return 0 if correct group ID, 1 if not
-int unpack_header(struct pkt_struct * rcv_pkt, address pk){
-
-	long int * p = (long int *) pk;
-	rcv_header = *p;
-
-	// Decode Group ID
-	long int gid_mask = 0b11110000000000000000000000000000;
-	long int temp = (rcv_header & gid_mask) >> 28;
-	rcv_pkt->group_id = temp;
-
-	if ((int)rcv_pkt->group_id != group_id)
-		return 1;
-
-
-	// Decode Type
-	long int type_mask = 0b00001110000000000000000000000000;
-	rcv_pkt->type = (rcv_header & type_mask) >> 25;
-
-	// Decode Request Number
-	long int request_mask = 0b00000001111111100000000000000000;
-	rcv_pkt->request_num = (rcv_header & request_mask) >> 17;
-
-	// Decode Padding
-	long int pad_mask = 0b00000000000000010000000000000000;
-	rcv_pkt->pad = (rcv_header & pad_mask) >> 16;
-
-	// Decode Sender ID
-	long int sid_mask = 0b00000000000000001111100000000000;
-	rcv_pkt->sender_id = (rcv_header & sid_mask) >> 11;
-
-	// Decode Receiver ID
-	long int rcv_mask = 0b00000000000000000000011111000000;
-	rcv_pkt->receiver_id = (rcv_header & rcv_mask) >> 6;
-
-	// Decode Record Index or Status
-	long int stat_mask = 0b00000000000000000000000000111111;
-	rcv_pkt->record_status = rcv_header & stat_mask;
-
-	return 0;
-}
-
 
 /********************* Receiver FSM, concurrent to root **********************/
 // TODO: NOT DONE. See below.
 fsm receiver {
     address packet; //received packets
+    address packet_res; //to build responses
    
     // Get packet
     state Receiving:
@@ -168,127 +67,64 @@ fsm receiver {
 
     // If packet properly received
     state OK:
-    // Cast packet into readable structure
-    rcv_pkt = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
-        check = unpack_header(rcv_pkt, packet+1);
+        // Cast packet into readable structure
+        struct pkt_struct * rcv_pkt = (struct pkt_struct *)(packet+1);
        
         // Check if correct group ID, return if wrong
-        if (check != 0){
-        diag("Bad group ID\r\n");
-        proceed Receiving;
+        if (rcv_pkt->group_id != group_id){
+	    diag("Bad group ID\r\n");
+	    proceed Receiving;
         }
        
         // Discovery Request
         if (rcv_pkt->type == 0){
             // Build Response
-   disc_res = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
-   disc_res->group_id = group_id;
-   disc_res->type = DISC_RES;
-   disc_res->request_num = rcv_pkt->request_num;
-   disc_res->sender_id = node_id;
-   disc_res->receiver_id = 0;
+	   disc_res = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
+	   disc_res->group_id = group_id;
+	   disc_res->type = DISC_RES;
+	   disc_res->request_num = rcv_pkt->request_num;
+	   disc_res->pad = 0;
+	   disc_res->sender_id = node_id;
+	   disc_res->receiver_id = 0;
+	   disc_res->record_status = 0;
    
-   // Finish building discovery response packet and send off
-   packet = tcv_wnp(OK, sfd, 32);
-   make_header(disc_res, packet+1);
-   tcv_endp(packet);
-   ufree(rcv_pkt);
-   ufree(disc_res); // Free up malloc'd space for sent packet
-}
+	   // Finish building discovery response packet and send off
+	   packet_res = tcv_wnp(OK, sfd, 30);
+	   packet_res[0] = 0;
+	   char *p = (char *)(packet_res+1);
+	   *p = disc_res->group_id; p++;
+	   *p = disc_res->type; p++;
+	   *p = disc_res->request_num; p++;
+	   *p = disc_res->pad; p++;
+	   *p = disc_res->sender_id; p++;
+	   *p = disc_res->receiver_id; p++;
+	   *p = disc_res->record_status; p++;
+	   strcat(p, disc_res->message);
+	   tcv_endp(packet_res);
+	   tcv_endp(packet);
+	   ufree(rcv_pkt);
+	   ufree(disc_res); // Free up malloc'd space for sent packet
+	   proceed Receiving;
+	}
        
         // Discovery Response
         else if (rcv_pkt->type == 1){
            // Record response
-           diag("yo its a discovery response\r\n");
            int neighs = strlen(neighbours);
            neighbours[neighs] = rcv_pkt->sender_id;
+           neighs++;
+           tcv_endp(packet);
+           proceed Receiving;
         }
+        
+        else
+           proceed Receiving;
        
-        // TODO: Figure out what to do with packets based on rest of types
-		// if create record on neighbour is received
-		if (rcv_pkt->type == CREATE_REC){
-            	proceed createRecord;
-            }
-		// if destroy record on neighbour is received
-        else if(rcv_pkt->type == DELETE_REC){
-            	proceed deleteRecord;
-            } 
-		else if(rcv_pkt->type == GET_REC){
-            	proceed getRecord;
-            } 
-		else if(rcv_pkt->type == RES_REC){
-            	proceed responseRecord;
-            } 
-
-
-        tcv_endp(packet);
-        proceed Receiving;
-
-	state createRecord:
-
-		if (entries >= MAX_RECORDS){
-			ser_outf(createRecord, "\r\n Maximum records reached");
-		}
-		else {
-			database[entries].ownerID = rcv_pkt->sender_id;
-    		strcpy(database[entries].payload, rcv_pkt->message); 
-    		database[entries].timeStamp = time(NULL);
-			entries++;
-			ser_outf(createRecord, "\r\n Data Saved");
-		}    	
-    	
-    	// we need to send ack here still
-    	tcv_endp(packet);
-    	proceed Receiving;
-    	
-   	state deleteRecord:
-
-   		int index = int(rcv_pkt->message[0]) // cast str int
-   		
-		if (entries == 0){
-			ser_outf(deleteRecord, "\r\n No record to delete");
-		}else if(index >= entries) {
-			ser_outf(deleteRecord, "\r\n Does not exist");
-		}else{
-			for (int i = index; i < entries; i++){
-				database[i] = database[i+1]; // shift entries to delete
-   			}
-		}
-   		
-   		// we need to send ack here still
-   		tcv_endp(packet);
-   		proceed Receiving;
-        // Continue receiving if message is not for this node
-        //proceed Receiving;
-
-	state getRecord:
-		int index = int(rcv_pkt->message[0]) // cast str int
-		if (entries == 0){
-			ser_outf(getRecord, "\r\n No record in database");
-		}else if (database[index] == NULL) {
-			ser_outf(getRecord, "\r\n Does not exist");
-		}else{ 
-			ser_outf(getRecord, "\r\n %s GOTTEEEE", database[index].payload); 
-		}
-    	// we need to send ack here still
-    	tcv_endp(packet);
-    	proceed Receiving;
-
-	state responseRecord:
-		if (entries == 0){
-			ser_outf(responseRecord, "\r\n No record in database");
-		}else{ 
-			ser_outf(responseRecord, "\r\n %s", rcv_pkt ->message); 
-		}
-    	// we need to send ack here still
-    	tcv_endp(packet);
-    	proceed Receiving;
 }
 
 // Main FSM for sending packets
 fsm root {
     char msg_string[20];
-    struct msg * ext_packet;
     int curr_store = 0;
     int total_store = 40;
     address packet;    
@@ -388,24 +224,30 @@ fsm root {
 
     // Build Discovery Request Packet
     state FIND_PROTOCOL:
-	    disc_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
-	    disc_req->group_id = group_id;
-	    disc_req->type = DISC_REQ;
-	    disc_req->request_num = 255; //TODO: Randomize
-	    disc_req->sender_id = node_id;
-	    disc_req->receiver_id = 0;
-	    disc_req->record_status = 0;
+	disc_req = (struct pkt_struct *)umalloc(sizeof(struct pkt_struct));
+	disc_req->group_id = group_id;
+	disc_req->type = DISC_REQ;
+	disc_req->request_num = 255; //TODO: Randomize
+	disc_req->pad = 0;
+	disc_req->sender_id = node_id;
+	disc_req->receiver_id = 0;
+	disc_req->record_status = 0;
 	   
     // Finish building discovery request packet and send off
     state FIND_SEND:
-	packet = tcv_wnp(FIND_SEND, sfd, 32);
-	make_header(disc_req, packet+1);
-	diag("Group_ID: %d\r\n", disc_req->group_id);
-	diag("Type: %d\r\n", disc_req->type);
-	diag("Request_Num: %d\r\n", disc_req->request_num);
-	diag("Sender: %d\r\n", disc_req->sender_id);
-	diag("Receiver: %d\r\n", disc_req->receiver_id);
-	diag("Record Status: %d\r\n", disc_req->record_status);
+    	diag("packaging");
+	packet = tcv_wnp(FIND_SEND, sfd, 30);
+	packet[0] = 0;
+	char *p = (char *)(packet+1);
+	*p = disc_res->group_id; p++;
+	*p = disc_res->type; p++;
+	*p = disc_res->request_num; p++;
+	*p = disc_res->pad; p++;
+	*p = disc_res->sender_id; p++;
+	*p = disc_res->receiver_id; p++;
+	*p = disc_res->record_status; p++;
+	strcat(p, disc_res->message);
+	
 	tcv_endp(packet);
 	ufree(disc_req); // Free up malloc'd space for sent packet
 	delay(3*1024, FIND_PRINT);
@@ -413,9 +255,9 @@ fsm root {
 
     // Print results
     state FIND_PRINT:
-    	diag (neighbours);
     	if (strlen(neighbours) > 0){
     	     ser_outf(FIND_PRINT, "%s\r\n", neighbours);
+    	     proceed MENU;
     	}
     	else
     	     ser_out(FIND_PRINT, "No neighbours\r\n");
