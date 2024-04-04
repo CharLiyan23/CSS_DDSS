@@ -172,7 +172,7 @@ fsm receiver {
     state createRecord:
 
 	if (entries >= MAX_RECORDS){
-		ser_outf(createRecord, "\r\n Maximum records reached");
+		ser_out(createRecord, "\r\n Maximum records reached");
 	}
 
 	else {
@@ -181,7 +181,7 @@ fsm receiver {
 		database[entries].timeStamp = time(NULL);
 		entries++;
 		curr_store++;
-		ser_outf(createRecord, "\r\n Data Saved");
+		ser_out(createRecord, "\r\n Data Saved");
 	}    	
 
 	// we need to send ack here still
@@ -193,12 +193,19 @@ fsm receiver {
 	  int index = (int)(rcv_pkt->message[0]); // cast str int
 
 	if (entries == 0){
+<<<<<<< HEAD
+		ser_out(deleteRecord, "\r\n No record to delete");
+	}else if(index >= entries) {
+		ser_out(deleteRecord, "\r\n Does not exist");
+	}else{
+=======
 		ser_outf(deleteRecord, "\r\n No record to delete");
 	}
 	else if(index >= entries) {
 		ser_outf(deleteRecord, "\r\n Does not exist");
 	}
 	else{
+>>>>>>> 28d6f86de18bc837661964c524bff9e98a656a07
 		for (int i = index; i < entries; i++){
 
 		database[i] = database[i+1]; // shift entries to delete
@@ -218,9 +225,9 @@ fsm receiver {
 		int index;
 		index = (int)(rcv_pkt->message[0]); // cast str int		
 		if (entries == 0){
-			ser_outf(getRecord, "\r\n No record in database");
+			ser_out(getRecord, "\r\n No record in database");
 		}else if (database[index].ownerID == NULL) {
-			ser_outf(getRecord, "\r\n Does not exist");
+			ser_out(getRecord, "\r\n Does not exist");
 		}else{ 
 			ser_outf(getRecord, "\r\n %s GOTTEEEE", database[index].payload); 
 		}
@@ -230,7 +237,7 @@ fsm receiver {
 
 	state responseRecord:
 		if (entries == 0){
-			ser_outf(responseRecord, "\r\n No record in database");
+			ser_out(responseRecord, "\r\n No record in database");
 		}else{ 
 			ser_outf(responseRecord, "\r\n %s", rcv_pkt ->message); 
 		}
@@ -295,9 +302,9 @@ fsm root {
 		else if ((cmd[0] == 'R') || (cmd[0] == 'r'))
 			proceed PLACEHOLDER;
 		else if ((cmd[0] == 'S') || (cmd[0] == 's'))
-			proceed SHOW_RECORD;
+			proceed SHOW_RECORDS;
 		else if ((cmd[0] == 'E') || (cmd[0] == 'e'))
-			proceed PLACEHOLDER;
+			proceed RESET;
 		else
     		proceed INPUT_ERROR;
    
@@ -475,24 +482,28 @@ fsm root {
 
 	state SHOW_RECORDS:
 		currRec =0; 
-
 		if (entries >0) {
-			ser_outf(SHOW_RECORDS,"Index\tTime Stamp\towner ID\tRecord Data\r\n");
+			ser_out(SHOW_RECORDS,"Index\tTime Stamp\towner ID\tRecord Data\r\n");
 		}else{
-			ser_outf(SHOW_RECORDS,"No Records to display\r\n");
+			ser_out(SHOW_RECORDS,"No Records to display\r\n");
 			proceed MENU;
 		}
 	state SHOW_RECORD:
-		if ( currRec <entries){
-			ser_outf(SHOW_RECORD,"%d\t%ld\t%d\t%s\r\n", currRec, database[currRec].timeStamp, database[currRec].ownerID, database[currRec].payload);
+		if ( currRec < entries){
+			diag("TimeStamp");
+			ser_outf(SHOW_RECORD,"%d\t%d\t%d\t\t%s\r\n", currRec, 10, database[currRec].ownerID, database[currRec].payload);
 		}else{
 			proceed MENU;
 		}
 		currRec++;
-		proceed SHOW_RECORDS;
+		proceed SHOW_RECORD;
 
 
     /**************************** Reset Protocol States ***************************/
+	state RESET:
+		entries =0; 
+		curr_store = 0;
+		proceed MENU;
 
 
    // temp placeholder (TODO: REMOVE BEFORE SUBMITTING)
